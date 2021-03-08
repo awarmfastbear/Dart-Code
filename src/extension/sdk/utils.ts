@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { commands, ExtensionContext, window } from "vscode";
-import { analyzerSnapshotPath, dartPlatformName, dartVMPath, DART_DOWNLOAD_URL, executableNames, flutterPath, FLUTTER_CREATE_PROJECT_TRIGGER_FILE, FLUTTER_DOWNLOAD_URL, isLinux, isMac, isWin, showLogAction } from "../../shared/constants";
+import { analyzerSnapshotPath, dartPlatformName, dartVMPath, DART_DOWNLOAD_URL, executableNames, flutterPath, FLUTTER_CREATE_PROJECT_TRIGGER_FILE, FLUTTER_DOWNLOAD_URL, isLinux, isMac, isWin, showLogAction, snapBinaryPath } from "../../shared/constants";
 import { Logger, Sdks, WorkspaceConfig } from "../../shared/interfaces";
 import { nullLogger } from "../../shared/logging";
 import { PackageMap } from "../../shared/pub/package_map";
@@ -361,10 +361,16 @@ export class SdkUtils {
 			const fullPath = path.join(p, executableFilename);
 
 			// In order to handle symlinks on the binary (not folder), we need to add the executableName before calling realpath.
-			const realExecutableLocation = p && fs.realpathSync(fullPath);
+			let realExecutableLocation = p && fs.realpathSync(fullPath);
 
-			if (realExecutableLocation.toLowerCase() !== fullPath.toLowerCase())
-				this.logger.info(`Following symlink: ${fullPath} ==> ${realExecutableLocation}`);
+			if (realExecutableLocation.toLowerCase() !== fullPath.toLowerCase()) {
+				if (realExecutableLocation === snapBinaryPath) {
+					this.logger.info(`Detected Snap binary, not following symlink! ${fullPath} ==> ${realExecutableLocation}`);
+					realExecutableLocation = fullPath;
+				} else {
+					this.logger.info(`Following symlink: ${fullPath} ==> ${realExecutableLocation}`);
+				}
+			}
 
 			// Then we need to take the executable name and /bin back off
 			return path.dirname(path.dirname(realExecutableLocation));
