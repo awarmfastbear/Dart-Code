@@ -1,15 +1,14 @@
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { commands, ExtensionContext, window } from "vscode";
-import { analyzerSnapshotPath, dartPlatformName, dartVMPath, DART_DOWNLOAD_URL, executableNames, flutterPath, flutterSnapScript, FLUTTER_CREATE_PROJECT_TRIGGER_FILE, FLUTTER_DOWNLOAD_URL, initializeSnapPrompt, isLinux, isMac, isWin, showLogAction } from "../../shared/constants";
+import { analyzerSnapshotPath, dartPlatformName, dartVMPath, DART_DOWNLOAD_URL, executableNames, flutterPath, FLUTTER_CREATE_PROJECT_TRIGGER_FILE, FLUTTER_DOWNLOAD_URL, isLinux, isMac, isWin, showLogAction } from "../../shared/constants";
 import { Logger, Sdks, WorkspaceConfig } from "../../shared/interfaces";
 import { nullLogger } from "../../shared/logging";
 import { PackageMap } from "../../shared/pub/package_map";
 import { flatMap, isDartSdkFromFlutter, notUndefined } from "../../shared/utils";
 import { fsPath, getSdkVersion, hasPubspec } from "../../shared/utils/fs";
 import { resolvedPromise } from "../../shared/utils/promises";
-import { processBazelWorkspace, processFlutterSnap, processFuchsiaWorkspace, processKnownGitRepositories } from "../../shared/utils/workspace";
+import { processBazelWorkspace, processFuchsiaWorkspace, processKnownGitRepositories } from "../../shared/utils/workspace";
 import { envUtils, getAllProjectFolders, getDartWorkspaceFolders } from "../../shared/vscode/utils";
 import { WorkspaceContext } from "../../shared/workspace";
 import { Analytics } from "../analytics";
@@ -237,7 +236,6 @@ export class SdkUtils {
 		// TODO: Remove this lambda when the preview flag is removed.
 		await processWorkspaceType(findBazelWorkspaceRoot, (l, c, b) => processBazelWorkspace(l, c, b, config.previewBazelWorkspaceCustomScripts));
 		const fuchsiaRoot = await processWorkspaceType(findFuchsiaRoot, processFuchsiaWorkspace);
-		await processWorkspaceType(findFlutterSnapSdkRoot, processFlutterSnap);
 
 		if (fuchsiaRoot) {
 			this.logger.info(`Found Fuchsia root at ${fuchsiaRoot}`);
@@ -457,25 +455,6 @@ async function findBazelWorkspaceRoot(logger: Logger, folder: string): Promise<s
 async function findGitRoot(logger: Logger, folder: string): Promise<string | undefined> {
 	return findRootContaining(folder, ".git");
 }
-
-async function findFlutterSnapSdkRoot(logger: Logger, folder: string): Promise<string | undefined> {
-	if (isLinux && fs.existsSync(flutterSnapScript)) {
-		logger.info(`Found Flutter snap script`);
-		const snapSdkRoot = path.join(os.homedir(), "/snap/flutter/common/flutter");
-
-		if (!fs.existsSync(snapSdkRoot + "/.git")) {
-			logger.info(`Flutter snap is not initialized, showing prompt`);
-			await initializeFlutterSdk(logger, flutterSnapScript, initializeSnapPrompt);
-		}
-
-		if (fs.existsSync(snapSdkRoot + "/.git")) {
-			logger.info(`Returning ${snapSdkRoot} as Flutter snap SDK root`);
-			return snapSdkRoot;
-		}
-	}
-	return undefined;
-}
-
 
 function findRootContaining(folder: string, childName: string, expectFile = false): string | undefined {
 	if (folder) {
