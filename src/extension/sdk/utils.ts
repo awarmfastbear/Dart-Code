@@ -367,7 +367,7 @@ export class SdkUtils {
 			// to get a real SDK and then re-check.
 			if (realExecutableLocation === snapBinaryPath) {
 				this.logger.info(`Flutter pointed at Snap binary, forcing initialization...`);
-				await initializeFlutterSdk(this.logger, realExecutableLocation);
+				await initializeFlutterSdk(this.logger, fullPath);
 
 				// Re-check as the symlink should've been updated to the new location now.
 				realExecutableLocation = fs.realpathSync(fullPath);
