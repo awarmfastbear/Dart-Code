@@ -105,7 +105,7 @@ export class SdkUtils {
 
 	public async showSdkActivationFailure(
 		sdkType: string,
-		search: (path: string[]) => string | undefined,
+		search: (path: string[]) => Promise<string | undefined>,
 		downloadUrl: string,
 		saveSdkPath: (path: string) => Thenable<void>,
 		commandToReRun?: string,
@@ -126,7 +126,7 @@ export class SdkUtils {
 				const selectedFolders =
 					await window.showOpenDialog({ canSelectFolders: true, openLabel: `Set ${sdkType} SDK folder` });
 				if (selectedFolders && selectedFolders.length > 0) {
-					const matchingSdkFolder = search(selectedFolders.map(fsPath));
+					const matchingSdkFolder = await search(selectedFolders.map(fsPath));
 					if (matchingSdkFolder) {
 						await saveSdkPath(matchingSdkFolder);
 						await promptToReloadExtension();
@@ -257,7 +257,7 @@ export class SdkUtils {
 			isLinux ? "~/snap/flutter/common/flutter" : undefined,
 		].concat(paths).filter(notUndefined);
 
-		const flutterSdkPath = this.findFlutterSdk(flutterSdkSearchPaths);
+		const flutterSdkPath = await this.findFlutterSdk(flutterSdkSearchPaths);
 		// Since we just blocked on a lot of sync FS, yield.
 		await resolvedPromise;
 
@@ -291,7 +291,7 @@ export class SdkUtils {
 				await initializeFlutterSdk(this.logger, path.join(flutterSdkPath, flutterPath));
 		}
 
-		const dartSdkPath = this.findDartSdk(dartSdkSearchPaths);
+		const dartSdkPath = await this.findDartSdk(dartSdkSearchPaths);
 
 		// Since we just blocked on a lot of sync FS, yield.
 		await resolvedPromise;
@@ -325,7 +325,7 @@ export class SdkUtils {
 		return fs.existsSync(fullPath) && fs.statSync(fullPath).isFile();
 	}
 
-	public searchPaths(paths: string[], executableFilename: string, postFilter?: (s: string) => boolean): string | undefined {
+	public async searchPaths(paths: string[], executableFilename: string, postFilter?: (s: string) => boolean): Promise<string | undefined> {
 		this.logger.info(`Searching for ${executableFilename}`);
 
 		let sdkPaths =
@@ -357,24 +357,28 @@ export class SdkUtils {
 			this.logger.info(`        ${p}`);
 
 		// Convert all the paths to their resolved locations.
-		sdkPaths = sdkPaths.map((p) => {
+		sdkPaths = await Promise.all(sdkPaths.map(async (p) => {
 			const fullPath = path.join(p, executableFilename);
 
 			// In order to handle symlinks on the binary (not folder), we need to add the executableName before calling realpath.
 			let realExecutableLocation = p && fs.realpathSync(fullPath);
 
-			if (realExecutableLocation.toLowerCase() !== fullPath.toLowerCase()) {
-				if (realExecutableLocation === snapBinaryPath) {
-					this.logger.info(`Detected Snap binary, not following symlink! ${fullPath} ==> ${realExecutableLocation}`);
-					realExecutableLocation = fullPath;
-				} else {
-					this.logger.info(`Following symlink: ${fullPath} ==> ${realExecutableLocation}`);
-				}
+			// If the file is a symlink to the Snap binary, it's never been run before so trigger initialization early
+			// to get a real SDK and then re-check.
+			if (realExecutableLocation === snapBinaryPath) {
+				this.logger.info(`Flutter pointed at Snap binary, forcing initialization...`);
+				await initializeFlutterSdk(this.logger, realExecutableLocation);
+
+				// Re-check as the symlink should've been updated to the new location now.
+				realExecutableLocation = fs.realpathSync(fullPath);
 			}
+
+			if (realExecutableLocation.toLowerCase() !== fullPath.toLowerCase())
+				this.logger.info(`Following symlink: ${fullPath} ==> ${realExecutableLocation}`);
 
 			// Then we need to take the executable name and /bin back off
 			return path.dirname(path.dirname(realExecutableLocation));
-		});
+		}));
 
 		// Now apply any post-filters.
 		this.logger.info("    Candidate paths to be post-filtered:");
