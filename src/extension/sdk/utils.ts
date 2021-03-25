@@ -369,8 +369,7 @@ export class SdkUtils {
 				this.logger.info(`Flutter pointed at Snap binary, forcing initialization...`);
 				await initializeFlutterSdk(this.logger, fullPath);
 
-				// Re-check as the symlink should've been updated to the new location now.
-				realExecutableLocation = fs.realpathSync(fullPath);
+				realExecutableLocation = "/snap/flutter/common/flutter/bin/flutter";
 			}
 
 			if (realExecutableLocation.toLowerCase() !== fullPath.toLowerCase())
