@@ -9,7 +9,7 @@ import { openLogContents } from "../utils";
 import { safeToolSpawn } from "../utils/processes";
 
 export async function initializeFlutterSdk(logger: Logger, flutterScript: string): Promise<void> {
-	logger.info(`Flutter is not initialized, running 'flutter config --machine'...`);
+	logger.info(`Flutter is not initialized, running 'flutter doctor' to force...`);
 	try {
 		await window.withProgress(
 			{
